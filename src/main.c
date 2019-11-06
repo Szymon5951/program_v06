@@ -10,10 +10,20 @@
 
 /* Private macro */
 
+/* Private function prototypes -----------------------------------------------*/
+
+// zmienne do pwm
+void UstawieniePWM(void);
+uint16_t CCR1_Val = 333;	//pulse 1
+uint16_t CCR2_Val = 249;	//pulse 2
+uint16_t PrescalerValue = 0;
+
 /* Private variables */
 uint8_t sendFlag=0;	// flaga s³u¿¹ca do sprawdzania czy przycisk nie zosta³ ju¿ wciœniêty
 
 char MESSAGE[] = "dupa";	// widomosc do USART2
+
+
 
 /* Private function prototypes */
 
@@ -27,7 +37,7 @@ void ZapalDiode1();
 void ZgasDiode1();
 
 // USART 2 - PA1(TX) , PA2(RX)
-void UstawienieUSART2(); // PA9(Tx), PA10(Rx)
+void UstawienieUSART1(); // PA9(Tx), PA10(Rx)
 
 void SendPacket(uint8_t *data, uint16_t length); // dwie funkcje do wysyslania danch przez USART
 void Send_Byte (uint8_t c);
@@ -47,21 +57,9 @@ void Send_Byte (uint8_t c);
 int main(void)
 {
 
-
-  /**
-  *  IMPORTANT NOTE!
-  *  The symbol VECT_TAB_SRAM needs to be defined when building the project
-  *  if code has been located to RAM and interrupts are used. 
-  *  Otherwise the interrupt table located in flash will be used.
-  *  See also the <system_*.c> file and how the SystemInit() function updates 
-  *  SCB->VTOR register.  
-  *  E.g.  SCB->VTOR = 0x20000000;  
-  */
-
   /* Enable clocks */
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA,ENABLE);
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD,ENABLE);
-
 
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
 
@@ -73,19 +71,26 @@ int main(void)
   UstawieniePIN(GPIOD,GPIO_Pin_15,GPIO_Mode_OUT); //niebieska
   /* Diody testowe */
   UstawieniePIN(GPIOA,GPIO_Pin_1,GPIO_Mode_OUT);
-
   /* USER Button */
   UstawieniePIN(GPIOA,GPIO_Pin_0,GPIO_Mode_IN);
   GPIO_SetBits(GPIOD, GPIO_Pin_14);
 
-  /* Transmisja USART2 */
-  void UstawienieUSART2();
+  /* Ustawienie timerów pod PWM , pod prêdkoœc obrotow¹ silnikow*/
+  UstawieniePWM();
 
+
+
+
+  /* Transmisja USART2 */
+  void UstawienieUSART1();
+
+  char c;
 
   /* Infinite loop */
   while (1)
   {
-	//i++;
+
+
 	if(GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_0) == 1)
 	{
 		GPIO_SetBits(GPIOD, GPIO_Pin_12);
@@ -95,8 +100,10 @@ int main(void)
 
 		if(sendFlag == 0)
 		{
-			//USART_SendData(USART2, 'd');
-			Send_Byte('d');
+			//USART_SendData(USART1, "d");
+			//Send_Byte("d");
+
+
 			sendFlag = 1;// flaga do sprawdzania czy przycisk wcisniety raz  i nie przytrzymywany
 		}
 
@@ -130,46 +137,53 @@ __INLINE void UstawieniePIN(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin, GPIOMode_Typ
 /*
  * Ustawiamy podstawowe parametry dla wybranego Pina
  */
-__INLINE void UstawienieUSART2()
+__INLINE void UstawienieUSART1()
 {
 	GPIO_InitTypeDef GPIO_InitStructure;
 	USART_InitTypeDef USART_InitStructure;
+	NVIC_InitTypeDef NVIC_InitStructure;
 
-    /* Init clock for GPIOA, with USART connected */
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
-    /* Init clock for DMA 1, with use RX transfer data */
-    RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
-    /* Init clock for USART2 */
-    RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
+	 // Enable peripheral
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE);
 
-	GPIO_PinAFConfig(GPIOA, GPIO_PinSource2, GPIO_AF_USART2);
-	GPIO_PinAFConfig(GPIOA, GPIO_PinSource3, GPIO_AF_USART2);
+    // Configure USART Interrupt
+    NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x0f;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x0f;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
 
-	 /* (1) Select AF mode (10) on PA9 and PA10 */
-	 GPIO_StructInit(&GPIO_InitStructure);
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3;
+    // GPIO AF config
+    GPIO_PinAFConfig(GPIOA, GPIO_PinSource9, GPIO_AF_USART1);
+    GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_USART1);
+
+
+    // Configure GPIO(UART TX/RX)
+	GPIO_StructInit(&GPIO_InitStructure);
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9 | GPIO_Pin_10;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
 	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
 
+    // Configure UART peripheral
 	USART_StructInit(&USART_InitStructure);
-	USART_InitStructure.USART_BaudRate = 9600;
+	USART_InitStructure.USART_BaudRate = 115200;
 	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
     USART_InitStructure.USART_StopBits = USART_StopBits_1;
 	USART_InitStructure.USART_Parity = USART_Parity_No;
 	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-	USART_InitStructure.USART_Mode = USART_Mode_Tx | USART_Mode_Rx;
-	USART_Init(USART2, &USART_InitStructure);
-	USART_Cmd(USART2,ENABLE);
+	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
 
+	USART_Init(USART1, &USART_InitStructure);
 
-    /* Configure IT */
-    /* (3) Set priority for USART1_IRQn */
-    /* (4) Enable USART1_IRQn */
-    NVIC_SetPriority(USART2_IRQn, 0); /* (3) */
-    NVIC_EnableIRQ(USART2_IRQn); /* (4) */
+    // Enable USART receive interrupt
+    USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);
+
+	USART_Cmd(USART1,ENABLE);
+
 
 }
 
@@ -197,8 +211,14 @@ void ZgasDiode1()
 */
 void Send_Byte (uint8_t c)
 {
-    while (USART_GetFlagStatus(USART2, USART_FLAG_TXE) == RESET);
-    USART_SendData(USART2, c);
+  //  while (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
+ //   USART_SendData(USART1, c);
+
+    // Wait until transmit data register is empty
+   // while (!USART_GetFlagStatus(USART1, USART_FLAG_TXE));
+    while(USART_GetFlagStatus(USART1,USART_FLAG_TXE) == RESET);
+    USART_SendData(USART1, c);
+
 }
 /**
 **===========================================================================
@@ -217,9 +237,71 @@ void SendPacket(uint8_t *data, uint16_t length)
     i++;
   }
 }
-void USART2_IRQHandler(void)
+void USART1_IRQHandler(void)
 {
+    char c;
 
+    if (USART_GetITStatus(USART1, USART_IT_RXNE) == SET)
+    {
+        c = USART_ReceiveData(USART1);
+
+        USART_SendData(USART1, 'c');
+    }
+}
+void UstawieniePWM(void)
+{
+  GPIO_InitTypeDef GPIO_InitStructure;
+  TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
+  TIM_OCInitTypeDef  TIM_OCInitStructure;
+
+  /* TIM3 clock enable */
+  RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
+  /* GPIOC and GPIOB clock enable */
+  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
+
+  /* GPIOC Configuration: TIM3 CH1 (PC6) and TIM3 CH2 (PC7) */
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_7 ;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP ;
+  GPIO_Init(GPIOC, &GPIO_InitStructure);
+
+  /* Connect TIM3 pins to AF2 */
+  GPIO_PinAFConfig(GPIOC, GPIO_PinSource6, GPIO_AF_TIM3);
+  GPIO_PinAFConfig(GPIOC, GPIO_PinSource7, GPIO_AF_TIM3);
+
+
+  /* Compute the prescaler value */
+  PrescalerValue = (uint16_t) ((SystemCoreClock /2) / 28000000) - 1;
+
+  /* Time base configuration */
+  TIM_TimeBaseStructure.TIM_Period = 665;
+  TIM_TimeBaseStructure.TIM_Prescaler = PrescalerValue;
+  TIM_TimeBaseStructure.TIM_ClockDivision = 0;
+  TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
+
+  TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure);
+
+  /* PWM1 Mode configuration: Channel1 */
+  TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
+  TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
+  TIM_OCInitStructure.TIM_Pulse = CCR1_Val;
+  TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;
+
+  TIM_OC1Init(TIM3, &TIM_OCInitStructure);
+  TIM_OC1PreloadConfig(TIM3, TIM_OCPreload_Enable);
+
+  /* PWM1 Mode configuration: Channel2 */
+  TIM_OCInitStructure.TIM_Pulse = CCR2_Val;
+
+  TIM_OC2Init(TIM3, &TIM_OCInitStructure);
+  TIM_OC2PreloadConfig(TIM3, TIM_OCPreload_Enable);
+
+  TIM_ARRPreloadConfig(TIM3, ENABLE);
+
+  /* TIM3 enable counter */
+  TIM_Cmd(TIM3, ENABLE);
 }
 
 /*
