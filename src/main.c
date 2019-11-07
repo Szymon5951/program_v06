@@ -9,42 +9,48 @@
 #include <stm32f4xx_adc.h>
 
 /* Private macro */
-
 /* Private function prototypes -----------------------------------------------*/
+/* Private variables */
+/* Private function prototypes */
+/* Private functions */
+/* Private define */
 
-// zmienne do pwm
+
+//Itemki podstawowe
+uint8_t sendFlag=0;	// flaga s³u¿¹ca do sprawdzania czy przycisk nie zosta³ ju¿ wciœniêty
+void UstawieniePIN(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin, GPIOMode_TypeDef mode);
+
+
+// itemki do pwm
 void UstawieniePWM(void);
 uint16_t CCR1_Val = 333;	//pulse 1
 uint16_t CCR2_Val = 249;	//pulse 2
 uint16_t PrescalerValue = 0;
 
-/* Private variables */
-uint8_t sendFlag=0;	// flaga s³u¿¹ca do sprawdzania czy przycisk nie zosta³ ju¿ wciœniêty
 
-char MESSAGE[] = "dupa";	// widomosc do USART2
+// itemki pod uart
+char MESSAGE[] = "dupa";	// widomosc do USART1
+void UstawienieUSART1(); // PB6(Tx), PB7(Rx)
+void Wyslij_zdanie(uint8_t *data, uint16_t length); // dwie funkcje do wysyslania danch przez USART
+void Wyslij_znak(uint8_t c);
+void OdpowiedzUART();
 
 
+//itemki pod adc
+void UstawienieADC3();
+#define ADC_CDR_ADDRESS    ((uint32_t)0x40012308)
+#define ADC3_DR_ADDRESS     ((uint32_t)0x4001224C)
+__IO uint16_t ADC3ConvertedValue = 0;
+__IO uint32_t ADC3ConvertedVoltage = 0;
+void ObslugaCzujkaOdleglosci();
 
-/* Private function prototypes */
 
-/* Private functions */
-void UstawieniePIN(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin, GPIOMode_TypeDef mode);
-
-// dioda PA1 - taka do zabawy/testÃ³w
+// itemki testowe
 #define Test1_Pin GPIO_Pin_1
 #define Test1_GPIO GPIOA
 void ZapalDiode1();
 void ZgasDiode1();
 
-// USART 2 - PA1(TX) , PA2(RX)
-void UstawienieUSART1(); // PA9(Tx), PA10(Rx)
-
-void SendPacket(uint8_t *data, uint16_t length); // dwie funkcje do wysyslania danch przez USART
-void Send_Byte (uint8_t c);
-
-
-
-/* Private define */
 
 
 /**
@@ -61,8 +67,6 @@ int main(void)
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA,ENABLE);
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD,ENABLE);
 
-  RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
-
 
   /* Initialize LEDs */
   UstawieniePIN(GPIOD,GPIO_Pin_12,GPIO_Mode_OUT); //zielona
@@ -76,32 +80,35 @@ int main(void)
   GPIO_SetBits(GPIOD, GPIO_Pin_14);
 
   /* Ustawienie timerów pod PWM , pod prêdkoœc obrotow¹ silnikow*/
-  UstawieniePWM();
-
-
-
+  //UstawieniePWM();
 
   /* Transmisja USART2 */
-  void UstawienieUSART1();
+  UstawienieUSART1();
 
-  char c;
+  //ustawienie adc
+  UstawienieADC3();
 
   /* Infinite loop */
   while (1)
   {
 
+	OdpowiedzUART();
 
 	if(GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_0) == 1)
 	{
 		GPIO_SetBits(GPIOD, GPIO_Pin_12);
 		GPIO_ResetBits(GPIOD, GPIO_Pin_14);
-		ZapalDiode1();
+		//ZapalDiode1();
+
 
 
 		if(sendFlag == 0)
 		{
 			//USART_SendData(USART1, "d");
 			//Send_Byte("d");
+			//Wyslij_zdanie(MESSAGE,4);
+
+			ObslugaCzujkaOdleglosci(); // wysyla jaka odleglosc  - w przyszlosci sprawdzanie odleglosci i zatrzymanie robota
 
 
 			sendFlag = 1;// flaga do sprawdzania czy przycisk wcisniety raz  i nie przytrzymywany
@@ -112,7 +119,7 @@ int main(void)
 	{
 			GPIO_ResetBits(GPIOD, GPIO_Pin_12);
 			GPIO_SetBits(GPIOD, GPIO_Pin_14);
-			ZgasDiode1();
+			//ZgasDiode1();
 
 			sendFlag=0; // flaga do sprawdzania czy przycisk wcisniety raz  i nie przytrzymywany
 
@@ -135,58 +142,145 @@ __INLINE void UstawieniePIN(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin, GPIOMode_Typ
 	GPIO_Init(GPIOx, &GPIO_InitStructure);
 }
 /*
- * Ustawiamy podstawowe parametry dla wybranego Pina
+ * U
  */
 __INLINE void UstawienieUSART1()
 {
-	GPIO_InitTypeDef GPIO_InitStructure;
-	USART_InitTypeDef USART_InitStructure;
-	NVIC_InitTypeDef NVIC_InitStructure;
+	/* --------------------------- System Clocks Configuration -----------------*/
+	  /* USART1 clock enable */
+	  RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE);
+	  /* GPIOB clock enable */
+	  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
 
-	 // Enable peripheral
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE);
+	  /**************************************************************************************/
 
-    // Configure USART Interrupt
-    NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x0f;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x0f;
-    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&NVIC_InitStructure);
+	  GPIO_InitTypeDef GPIO_InitStructure;
+	  /*-------------------------- GPIO Configuration ----------------------------*/
+	  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_7;
+	  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+	  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	  GPIO_Init(GPIOB, &GPIO_InitStructure);
+	  /* Connect USART pins to AF */
+	  GPIO_PinAFConfig(GPIOB, GPIO_PinSource6, GPIO_AF_USART1); // USART1_TX
+	  GPIO_PinAFConfig(GPIOB, GPIO_PinSource7, GPIO_AF_USART1); // USART1_RX
 
-    // GPIO AF config
-    GPIO_PinAFConfig(GPIOA, GPIO_PinSource9, GPIO_AF_USART1);
-    GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_USART1);
-
-
-    // Configure GPIO(UART TX/RX)
-	GPIO_StructInit(&GPIO_InitStructure);
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9 | GPIO_Pin_10;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
-	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-	GPIO_Init(GPIOA, &GPIO_InitStructure);
-
-    // Configure UART peripheral
-	USART_StructInit(&USART_InitStructure);
-	USART_InitStructure.USART_BaudRate = 115200;
-	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
-    USART_InitStructure.USART_StopBits = USART_StopBits_1;
-	USART_InitStructure.USART_Parity = USART_Parity_No;
-	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
-
-	USART_Init(USART1, &USART_InitStructure);
-
-    // Enable USART receive interrupt
-    USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);
-
-	USART_Cmd(USART1,ENABLE);
-
+	  USART_InitTypeDef USART_InitStructure;
+	  /* USARTx configuration ------------------------------------------------------*/
+	  /* USARTx configured as follow:
+	  - BaudRate = 9600 baud
+	  - Word Length = 8 Bits
+	  - One Stop Bit
+	  - No parity
+	  - Hardware flow control disabled (RTS and CTS signals)
+	  - Receive and transmit enabled
+	  */
+	  USART_InitStructure.USART_BaudRate = 9600;
+	  USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+	  USART_InitStructure.USART_StopBits = USART_StopBits_1;
+	  USART_InitStructure.USART_Parity = USART_Parity_No;
+	  USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+	  USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+	  USART_Init(USART1, &USART_InitStructure);
+	  USART_Cmd(USART1, ENABLE);
 
 }
+void OdpowiedzUART()
+{
+	if(USART_GetFlagStatus(USART1,USART_FLAG_RXNE))
+	{
+		char c = USART_ReceiveData(USART1);
+	    USART_SendData(USART1,c );
+	    GPIO_SetBits(GPIOB, GPIO_Pin_10);
+	    if(c == 'g')
+	    {
+	    	GPIO_SetBits(GPIOB, GPIO_Pin_11);
+	    }
 
+
+    }
+}
+void UstawienieADC3()
+{
+	ADC_InitTypeDef       ADC_InitStructure;
+	  ADC_CommonInitTypeDef ADC_CommonInitStructure;
+	  DMA_InitTypeDef       DMA_InitStructure;
+	  GPIO_InitTypeDef      GPIO_InitStructure;
+
+	  /* Enable ADC3, DMA2 and GPIO clocks ****************************************/
+	  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2 | RCC_AHB1Periph_GPIOC, ENABLE);
+	  RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC3, ENABLE);
+
+	  /* DMA2 Stream0 channel0 configuration **************************************/
+	  DMA_InitStructure.DMA_Channel = DMA_Channel_2;
+	  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)ADC3_DR_ADDRESS;
+	  DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)&ADC3ConvertedValue;
+	  DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralToMemory;
+	  DMA_InitStructure.DMA_BufferSize = 1;
+	  DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+	  DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Disable;
+	  DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
+	  DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
+	  DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
+	  DMA_InitStructure.DMA_Priority = DMA_Priority_High;
+	  DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;
+	  DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_HalfFull;
+	  DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
+	  DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
+	  DMA_Init(DMA2_Stream0, &DMA_InitStructure);
+	  DMA_Cmd(DMA2_Stream0, ENABLE);
+
+	  /* Configure ADC3 Channel12 pin as analog input ******************************/
+	  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
+	  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
+	  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL ;
+	  GPIO_Init(GPIOC, &GPIO_InitStructure);
+
+	  /* ADC Common Init **********************************************************/
+	  ADC_CommonInitStructure.ADC_Mode = ADC_Mode_Independent;
+	  ADC_CommonInitStructure.ADC_Prescaler = ADC_Prescaler_Div2;
+	  ADC_CommonInitStructure.ADC_DMAAccessMode = ADC_DMAAccessMode_Disabled;
+	  ADC_CommonInitStructure.ADC_TwoSamplingDelay = ADC_TwoSamplingDelay_5Cycles;
+	  ADC_CommonInit(&ADC_CommonInitStructure);
+
+	  /* ADC3 Init ****************************************************************/
+	  ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
+	  ADC_InitStructure.ADC_ScanConvMode = DISABLE;
+	  ADC_InitStructure.ADC_ContinuousConvMode = ENABLE;
+	  ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
+	  ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
+	  ADC_InitStructure.ADC_NbrOfConversion = 1;
+	  ADC_Init(ADC3, &ADC_InitStructure);
+
+	  /* ADC3 regular channel12 configuration *************************************/
+	  ADC_RegularChannelConfig(ADC3, ADC_Channel_12, 1, ADC_SampleTime_3Cycles);
+
+	 /* Enable DMA request after last transfer (Single-ADC mode) */
+	  ADC_DMARequestAfterLastTransferCmd(ADC3, ENABLE);
+
+	  /* Enable ADC3 DMA */
+	  ADC_DMACmd(ADC3, ENABLE);
+
+	  /* Enable ADC3 */
+	  ADC_Cmd(ADC3, ENABLE);
+
+	  /* Start ADC3 Software Conversion */
+	  ADC_SoftwareStartConv(ADC3);
+}
+
+void ObslugaCzujkaOdleglosci()
+{
+	ADC3ConvertedVoltage = ADC3ConvertedValue *3300/0xFFF;
+	uint32_t v=0,mv=0;
+	uint8_t text[50];
+
+	// HEH przeliczanie tego gÃ³wna
+	v=(ADC3ConvertedVoltage)/1000;
+	mv = (ADC3ConvertedVoltage%1000)/100;
+	sprintf((char*)text,"   ADC = %d,%d V   ",v,mv);	// podobno uzywanie sprintf do wysylki przez uart mega obciaza procka
+	Wyslij_zdanie(text,20);
+}
 
 /*
  * Zapala diode testow¹ 1
@@ -209,16 +303,10 @@ void ZgasDiode1()
 **
 **===========================================================================
 */
-void Send_Byte (uint8_t c)
+void Wyslij_znak (uint8_t c)
 {
-  //  while (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
- //   USART_SendData(USART1, c);
-
-    // Wait until transmit data register is empty
-   // while (!USART_GetFlagStatus(USART1, USART_FLAG_TXE));
-    while(USART_GetFlagStatus(USART1,USART_FLAG_TXE) == RESET);
-    USART_SendData(USART1, c);
-
+	while(USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET); // Wait for Empty
+	USART_SendData(USART1, c);
 }
 /**
 **===========================================================================
@@ -227,27 +315,17 @@ void Send_Byte (uint8_t c)
 **
 **===========================================================================
 */
-void SendPacket(uint8_t *data, uint16_t length)
+void Wyslij_zdanie(uint8_t *data, uint16_t length)
 {
   uint16_t i;
   i = 0;
   while (i < length)
   {
-    Send_Byte(data[i]);
+    Wyslij_znak(data[i]);
     i++;
   }
 }
-void USART1_IRQHandler(void)
-{
-    char c;
 
-    if (USART_GetITStatus(USART1, USART_IT_RXNE) == SET)
-    {
-        c = USART_ReceiveData(USART1);
-
-        USART_SendData(USART1, 'c');
-    }
-}
 void UstawieniePWM(void)
 {
   GPIO_InitTypeDef GPIO_InitStructure;
