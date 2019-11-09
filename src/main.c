@@ -50,7 +50,19 @@ void ObslugaCzujkaOdleglosci();
 #define Test1_GPIO GPIOA
 void ZapalDiode1();
 void ZgasDiode1();
+int silniki_testy = 0;
 
+// itemki podsterownik silnika
+void UstawienieSilnikow();
+
+void Silniki_Przod();
+void Silniki_Stop();
+void Silniki_Tyl();
+void Silniki_Lewo();
+void Silniki_Prawo();
+
+
+void Ustawianie();
 
 
 /**
@@ -66,21 +78,17 @@ int main(void)
   /* Enable clocks */
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA,ENABLE);
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD,ENABLE);
+  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE,ENABLE);
 
 
-  /* Initialize LEDs */
-  UstawieniePIN(GPIOD,GPIO_Pin_12,GPIO_Mode_OUT); //zielona
-  UstawieniePIN(GPIOD,GPIO_Pin_13,GPIO_Mode_OUT); //pomarañczowa
-  UstawieniePIN(GPIOD,GPIO_Pin_14,GPIO_Mode_OUT); //czerwona
-  UstawieniePIN(GPIOD,GPIO_Pin_15,GPIO_Mode_OUT); //niebieska
-  /* Diody testowe */
-  UstawieniePIN(GPIOA,GPIO_Pin_1,GPIO_Mode_OUT);
-  /* USER Button */
-  UstawieniePIN(GPIOA,GPIO_Pin_0,GPIO_Mode_IN);
-  GPIO_SetBits(GPIOD, GPIO_Pin_14);
+  /* Ustawienie ledów, przycisków itp*/
+  Ustawianie();
+
+  /* Ustawienie pinow pod silniki*/
+  UstawienieSilnikow();
 
   /* Ustawienie timerów pod PWM , pod prêdkoœc obrotow¹ silnikow*/
-  //UstawieniePWM();
+  UstawieniePWM();
 
   /* Transmisja USART2 */
   UstawienieUSART1();
@@ -102,6 +110,7 @@ int main(void)
 
 
 
+
 		if(sendFlag == 0)
 		{
 			//USART_SendData(USART1, "d");
@@ -112,6 +121,33 @@ int main(void)
 
 
 			sendFlag = 1;// flaga do sprawdzania czy przycisk wcisniety raz  i nie przytrzymywany
+
+
+			if(silniki_testy == 0)
+			{
+				Silniki_Przod();
+				silniki_testy = 1;
+			}
+			else if(silniki_testy == 1)
+			{
+				Silniki_Tyl();
+				silniki_testy = 2;
+			}
+			else if(silniki_testy == 2)
+			{
+				Silniki_Stop();
+				silniki_testy = 3;
+			}
+			else if(silniki_testy == 3)
+			{
+				Silniki_Lewo();
+				silniki_testy = 4;
+			}
+			else if(silniki_testy == 4)
+			{
+				Silniki_Prawo();
+				silniki_testy = 0;
+			}
 		}
 
 	}
@@ -120,6 +156,7 @@ int main(void)
 			GPIO_ResetBits(GPIOD, GPIO_Pin_12);
 			GPIO_SetBits(GPIOD, GPIO_Pin_14);
 			//ZgasDiode1();
+
 
 			sendFlag=0; // flaga do sprawdzania czy przycisk wcisniety raz  i nie przytrzymywany
 
@@ -354,8 +391,8 @@ void UstawieniePWM(void)
   PrescalerValue = (uint16_t) ((SystemCoreClock /2) / 28000000) - 1;
 
   /* Time base configuration */
-  TIM_TimeBaseStructure.TIM_Period = 665;
-  TIM_TimeBaseStructure.TIM_Prescaler = PrescalerValue;
+  TIM_TimeBaseStructure.TIM_Period = 19999;//665;
+  TIM_TimeBaseStructure.TIM_Prescaler = 4799;//PrescalerValue;
   TIM_TimeBaseStructure.TIM_ClockDivision = 0;
   TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
 
@@ -364,7 +401,7 @@ void UstawieniePWM(void)
   /* PWM1 Mode configuration: Channel1 */
   TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
   TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
-  TIM_OCInitStructure.TIM_Pulse = CCR1_Val;
+  TIM_OCInitStructure.TIM_Pulse = 9999;//CCR1_Val;
   TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;
 
   TIM_OC1Init(TIM3, &TIM_OCInitStructure);
@@ -380,6 +417,82 @@ void UstawieniePWM(void)
 
   /* TIM3 enable counter */
   TIM_Cmd(TIM3, ENABLE);
+}
+
+void Ustawianie()
+{
+	/* Initialize LEDs */
+	  UstawieniePIN(GPIOD,GPIO_Pin_12,GPIO_Mode_OUT); //zielona
+	  UstawieniePIN(GPIOD,GPIO_Pin_13,GPIO_Mode_OUT); //pomarañczowa
+	  UstawieniePIN(GPIOD,GPIO_Pin_14,GPIO_Mode_OUT); //czerwona
+	  UstawieniePIN(GPIOD,GPIO_Pin_15,GPIO_Mode_OUT); //niebieska
+	  /* Diody testowe */
+	  UstawieniePIN(GPIOA,GPIO_Pin_1,GPIO_Mode_OUT);
+	  /* USER Button */
+	  UstawieniePIN(GPIOA,GPIO_Pin_0,GPIO_Mode_IN);
+	  GPIO_SetBits(GPIOD, GPIO_Pin_14);
+}
+void UstawienieSilnikow()
+{
+	 UstawieniePIN(GPIOE, GPIO_Pin_8, GPIO_Mode_OUT);	//IN1
+	 UstawieniePIN(GPIOE, GPIO_Pin_10, GPIO_Mode_OUT);	//IN2
+	 UstawieniePIN(GPIOE, GPIO_Pin_12, GPIO_Mode_OUT);	//IN3
+	 UstawieniePIN(GPIOE, GPIO_Pin_14, GPIO_Mode_OUT);	//IN3
+
+}
+void Silniki_Przod()
+{
+	//Silnik1
+	GPIO_SetBits(GPIOE, GPIO_Pin_8);	//LEWY
+	GPIO_ResetBits(GPIOE, GPIO_Pin_10);
+
+	//Silnik 2
+	GPIO_SetBits(GPIOE, GPIO_Pin_12);	//PRAWY
+    GPIO_ResetBits(GPIOE, GPIO_Pin_14);
+}
+void Silniki_Stop()
+{
+	//Silnik1
+	GPIO_ResetBits(GPIOE, GPIO_Pin_8);	//LEWY
+	GPIO_ResetBits(GPIOE, GPIO_Pin_10);
+
+	//Silnik 2
+	GPIO_ResetBits(GPIOE, GPIO_Pin_12);	//PRAWY
+    GPIO_ResetBits(GPIOE, GPIO_Pin_14);
+}
+void Silniki_Tyl()
+{
+	//Silnik1
+	GPIO_ResetBits(GPIOE, GPIO_Pin_8);	//LEWY
+	GPIO_SetBits(GPIOE, GPIO_Pin_10);
+
+	//Silnik 2
+	GPIO_ResetBits(GPIOE, GPIO_Pin_12);	//PRAWY
+    GPIO_SetBits(GPIOE, GPIO_Pin_14);
+
+}
+void Silniki_Lewo()
+{
+	//Silnik1
+	GPIO_ResetBits(GPIOE, GPIO_Pin_8);	//LEWY
+	GPIO_SetBits(GPIOE, GPIO_Pin_10);
+
+	//Silnik 2
+	GPIO_SetBits(GPIOE, GPIO_Pin_12);	//PRAWY
+    GPIO_ResetBits(GPIOE, GPIO_Pin_14);
+
+
+}
+void Silniki_Prawo()
+{
+	//Silnik1
+	GPIO_SetBits(GPIOE, GPIO_Pin_8);	//LEWY
+	GPIO_ResetBits(GPIOE, GPIO_Pin_10);
+
+	//Silnik 2
+	GPIO_ResetBits(GPIOE, GPIO_Pin_12);	//PRAWY
+    GPIO_SetBits(GPIOE, GPIO_Pin_14);
+
 }
 
 /*
