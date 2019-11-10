@@ -21,12 +21,23 @@ uint8_t sendFlag=0;	// flaga s³u¿¹ca do sprawdzania czy przycisk nie zosta³ ju¿ 
 void UstawieniePIN(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin, GPIOMode_TypeDef mode);
 
 
-// itemki do pwm
+// itemki do pwm i enkodery
 void UstawieniePWM(void);
-uint16_t CCR1_Val = 333;	//pulse 1
-uint16_t CCR2_Val = 249;	//pulse 2
-uint16_t PrescalerValue = 0;
+int Pulse_lewy = 200;	//pulse 1	LEWY
+int Pulse_prawy = 200;	//pulse 2	PRAWY
+char Pulse_lewy_char[] = " ";	//pulse 1	LEWY
+char Pulse_prawy_char[] = " ";	//pulse 2	PRAWY
 
+uint16_t PeroidValue = 255;
+uint16_t PrescalerValue = 392;
+
+// kurde wrzystko to jak narazie pod regulacje predkosci silników
+int licznik_lewy = 0;
+char licznik_lewy_char[] = "0";
+int licznik_prawy = 0;
+char licznik_prawy_char[] = "0";
+void UstawieniePrzerwanPE0();
+void UstawieniePrzerwanPE1();
 
 // itemki pod uart
 char MESSAGE[] = "dupa";	// widomosc do USART1
@@ -52,7 +63,7 @@ void ZapalDiode1();
 void ZgasDiode1();
 int silniki_testy = 0;
 
-// itemki podsterownik silnika
+// itemki pod sterownik silnika
 void UstawienieSilnikow();
 
 void Silniki_Przod();
@@ -61,7 +72,7 @@ void Silniki_Tyl();
 void Silniki_Lewo();
 void Silniki_Prawo();
 
-
+// funkja zawieraj¹ca wszystkie ustawiania
 void Ustawianie();
 
 
@@ -90,23 +101,36 @@ int main(void)
   /* Ustawienie timerów pod PWM , pod prêdkoœc obrotow¹ silnikow*/
   UstawieniePWM();
 
-  /* Transmisja USART2 */
+  /* Ustawienie enkoderów*/
+  UstawieniePIN(GPIOE, GPIO_Pin_7, GPIO_Mode_IN);	//LEWY B
+  UstawieniePIN(GPIOE, GPIO_Pin_9, GPIO_Mode_IN);	//PRAWY B
+
+  //UstawieniePrzerwanEnkoderow();
+  UstawieniePrzerwanPE0();
+  UstawieniePrzerwanPE1();
+
+  /* Transmisja USART1 */
   UstawienieUSART1();
 
   //ustawienie adc
   UstawienieADC3();
 
+
   /* Infinite loop */
   while (1)
   {
 
-	OdpowiedzUART();
+	OdpowiedzUART(); // funkcja z automatu odsyla wiadomosci odebrane :P
 
-	if(GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_0) == 1)
+
+
+
+	if(GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_0) == 1) // przycisk
 	{
 		GPIO_SetBits(GPIOD, GPIO_Pin_12);
 		GPIO_ResetBits(GPIOD, GPIO_Pin_14);
 		//ZapalDiode1();
+
 
 
 
@@ -117,37 +141,79 @@ int main(void)
 			//Send_Byte("d");
 			//Wyslij_zdanie(MESSAGE,4);
 
-			ObslugaCzujkaOdleglosci(); // wysyla jaka odleglosc  - w przyszlosci sprawdzanie odleglosci i zatrzymanie robota
+			//ObslugaCzujkaOdleglosci(); // wysyla jaka odleglosc  - w przyszlosci sprawdzanie odleglosci i zatrzymanie robota
 
 
 			sendFlag = 1;// flaga do sprawdzania czy przycisk wcisniety raz  i nie przytrzymywany
 
 
-			if(silniki_testy == 0)
-			{
-				Silniki_Przod();
-				silniki_testy = 1;
-			}
-			else if(silniki_testy == 1)
-			{
-				Silniki_Tyl();
-				silniki_testy = 2;
-			}
-			else if(silniki_testy == 2)
-			{
-				Silniki_Stop();
-				silniki_testy = 3;
-			}
-			else if(silniki_testy == 3)
-			{
-				Silniki_Lewo();
-				silniki_testy = 4;
-			}
-			else if(silniki_testy == 4)
-			{
-				Silniki_Prawo();
-				silniki_testy = 0;
-			}
+					if(silniki_testy == 0)
+					{
+						Silniki_Przod();
+						silniki_testy = 1;
+					}
+					else if(silniki_testy == 1)
+					{
+						Silniki_Stop();
+						silniki_testy = 0;
+					}
+
+
+
+			// pulsy na pwm
+			sprintf(Pulse_prawy_char,"%d",Pulse_prawy);
+			sprintf(Pulse_lewy_char,"%d",Pulse_lewy);
+
+			Wyslij_zdanie("Lewy: ",6);
+			Wyslij_zdanie(Pulse_lewy_char,3);
+			Wyslij_zdanie("  ",2);
+			Wyslij_zdanie("Prawy: ",7);
+			Wyslij_zdanie(Pulse_prawy_char,3);
+			Wyslij_zdanie("\r\n",4);
+
+
+			//obroty na kolach
+			sprintf(licznik_lewy_char,"%d",licznik_lewy);
+			Wyslij_zdanie("Lewy: ",6);
+			Wyslij_zdanie(licznik_lewy_char,10);
+			Wyslij_zdanie("  ",2);
+
+			sprintf(licznik_prawy_char,"%d",licznik_prawy);
+			Wyslij_zdanie("Prawy: ",7);
+			Wyslij_zdanie(licznik_prawy_char,10);
+			Wyslij_zdanie("\r\n",4);
+			Wyslij_zdanie("\r\n",4);
+
+			/*
+
+					if(silniki_testy == 0)
+					{
+						Silniki_Przod();
+						silniki_testy = 1;
+					}
+					else if(silniki_testy == 1)
+					{
+						Silniki_Tyl();
+						silniki_testy = 2;
+					}
+					else if(silniki_testy == 2)
+					{
+						Silniki_Stop();
+						silniki_testy = 3;
+					}
+					else if(silniki_testy == 3)
+					{
+						Silniki_Lewo();
+						silniki_testy = 4;
+					}
+					else if(silniki_testy == 4)
+					{
+						Silniki_Prawo();
+						silniki_testy = 0;
+					}
+					*/
+
+
 		}
 
 	}
@@ -240,7 +306,7 @@ void OdpowiedzUART()
 }
 void UstawienieADC3()
 {
-	ADC_InitTypeDef       ADC_InitStructure;
+	  ADC_InitTypeDef       ADC_InitStructure;
 	  ADC_CommonInitTypeDef ADC_CommonInitStructure;
 	  DMA_InitTypeDef       DMA_InitStructure;
 	  GPIO_InitTypeDef      GPIO_InitStructure;
@@ -354,6 +420,7 @@ void Wyslij_znak (uint8_t c)
 */
 void Wyslij_zdanie(uint8_t *data, uint16_t length)
 {
+	/*
   uint16_t i;
   i = 0;
   while (i < length)
@@ -361,6 +428,9 @@ void Wyslij_zdanie(uint8_t *data, uint16_t length)
     Wyslij_znak(data[i]);
     i++;
   }
+  */
+  while(*data)
+	  Wyslij_znak(*data++);
 }
 
 void UstawieniePWM(void)
@@ -387,12 +457,11 @@ void UstawieniePWM(void)
   GPIO_PinAFConfig(GPIOC, GPIO_PinSource7, GPIO_AF_TIM3);
 
 
-  /* Compute the prescaler value */
-  PrescalerValue = (uint16_t) ((SystemCoreClock /2) / 28000000) - 1;
+
 
   /* Time base configuration */
-  TIM_TimeBaseStructure.TIM_Period = 19999;//665;
-  TIM_TimeBaseStructure.TIM_Prescaler = 4799;//PrescalerValue;
+  TIM_TimeBaseStructure.TIM_Period = PeroidValue;//19999;//665;
+  TIM_TimeBaseStructure.TIM_Prescaler = PrescalerValue;//4799;//PrescalerValue;
   TIM_TimeBaseStructure.TIM_ClockDivision = 0;
   TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
 
@@ -401,14 +470,14 @@ void UstawieniePWM(void)
   /* PWM1 Mode configuration: Channel1 */
   TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
   TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
-  TIM_OCInitStructure.TIM_Pulse = 9999;//CCR1_Val;
+  TIM_OCInitStructure.TIM_Pulse = Pulse_lewy;//9999;//CCR1_Val;
   TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;
 
   TIM_OC1Init(TIM3, &TIM_OCInitStructure);
   TIM_OC1PreloadConfig(TIM3, TIM_OCPreload_Enable);
 
   /* PWM1 Mode configuration: Channel2 */
-  TIM_OCInitStructure.TIM_Pulse = CCR2_Val;
+  TIM_OCInitStructure.TIM_Pulse = Pulse_prawy;//CCR2_Val;
 
   TIM_OC2Init(TIM3, &TIM_OCInitStructure);
   TIM_OC2PreloadConfig(TIM3, TIM_OCPreload_Enable);
@@ -417,6 +486,84 @@ void UstawieniePWM(void)
 
   /* TIM3 enable counter */
   TIM_Cmd(TIM3, ENABLE);
+}
+
+void UstawieniePrzerwanPE0()
+{
+	GPIO_InitTypeDef GPIO_InitStructure;
+	EXTI_InitTypeDef EXTI_InitStructure;
+	NVIC_InitTypeDef NVIC_InitStructure;
+
+	/* Enable clocks */
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+
+	/* Set pin as input */
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
+    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+    GPIO_Init(GPIOE, &GPIO_InitStructure);
+
+	/* Connect EXTI Line0 to PA0 pin */
+	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOE, EXTI_PinSource0);
+
+	/* Configure EXTI Line0 */
+	EXTI_InitStructure.EXTI_Line = EXTI_Line0;
+	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
+	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+	EXTI_Init(&EXTI_InitStructure);
+
+
+	/* Enable and set EXTI Line0 Interrupt to the lowest priority */
+	NVIC_InitStructure.NVIC_IRQChannel = EXTI0_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x01;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x01;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
+
+
+
+
+}
+
+void UstawieniePrzerwanPE1()
+{
+	GPIO_InitTypeDef GPIO_InitStructure;
+	EXTI_InitTypeDef EXTI_InitStructure;
+	NVIC_InitTypeDef NVIC_InitStructure;
+
+	/* Enable clocks */
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+
+	/* Set pin as input */
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
+    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+    GPIO_Init(GPIOE, &GPIO_InitStructure);
+
+	/* Connect EXTI Line0 to PA0 pin */
+	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOE, EXTI_PinSource1);
+
+	/* Configure EXTI Line1 */
+	EXTI_InitStructure.EXTI_Line = EXTI_Line1;
+	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
+	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+	EXTI_Init(&EXTI_InitStructure);
+
+	/* Enable and set EXTI Line1 Interrupt to the lowest priority */
+	NVIC_InitStructure.NVIC_IRQChannel = EXTI1_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x01;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x01;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
 }
 
 void Ustawianie()
@@ -512,3 +659,60 @@ uint16_t EVAL_AUDIO_GetSampleCallBack(void){
   /* TODO, implement your code here */
   return -1;
 }
+/* Set interrupt handlers */
+/* Handle PD0 interrupt */
+void EXTI0_IRQHandler(void) {
+    /* Make sure that interrupt flag is set */
+    if (EXTI_GetITStatus(EXTI_Line0) != RESET) {
+        /* Do your stuff when PD0 is changed */
+    	//GPIO_ToggleBits(GPIOD,GPIO_Pin_15);
+
+
+    			if(GPIO_ReadInputDataBit(GPIOE, GPIO_Pin_7) == 1)
+    			{
+    				licznik_lewy++;
+
+    			}
+    			else if(GPIO_ReadInputDataBit(GPIOE, GPIO_Pin_7) == 0)
+    			{
+    				licznik_lewy--;
+    			}
+
+    		if(licznik_lewy > 10000 || licznik_lewy <-10000)
+    		{
+    			licznik_lewy = 0;
+    		}
+
+
+        /* Clear interrupt flag */
+        EXTI_ClearITPendingBit(EXTI_Line0);
+    }
+}
+void EXTI1_IRQHandler(void) {
+    /* Make sure that interrupt flag is set */
+    if (EXTI_GetITStatus(EXTI_Line1) != RESET) {
+        /* Do your stuff when PE1 is changed */
+    	//GPIO_ToggleBits(GPIOD,GPIO_Pin_15);
+
+
+    			if(GPIO_ReadInputDataBit(GPIOE, GPIO_Pin_9) == 1)
+    			{
+    				licznik_prawy--;
+
+    			}
+    			else if(GPIO_ReadInputDataBit(GPIOE, GPIO_Pin_9) == 0)
+    			{
+    				licznik_prawy++;
+    			}
+
+    		if(licznik_prawy > 10000 || licznik_prawy <-10000)
+    		{
+    			licznik_prawy = 0;
+    		}
+
+
+        /* Clear interrupt flag */
+        EXTI_ClearITPendingBit(EXTI_Line1);
+    }
+}
+
