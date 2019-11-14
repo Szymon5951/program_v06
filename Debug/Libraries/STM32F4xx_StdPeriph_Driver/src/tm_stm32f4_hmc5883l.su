@@ -1,0 +1,4 @@
+tm_stm32f4_hmc5883l.c:26:22:TM_HMC5883L_Init	32	static
+tm_stm32f4_hmc5883l.c:98:22:TM_HMC5883L_DataReady	16	static
+tm_stm32f4_hmc5883l.c:109:22:TM_HMC5883L_Read	32	static
+tm_stm32f4_hmc5883l.c:138:22:TM_HMC5883L_ProcessInterrupt	16	static

@@ -1,0 +1,8 @@
+tm_stm32f4_exti.c:21:18:TM_EXTI_Attach	48	static
+tm_stm32f4_exti.c:149:18:TM_EXTI_Detach	16	static
+tm_stm32f4_exti.c:162:6:TM_EXTI_DeInit	4	static
+tm_stm32f4_exti.c:175:6:EXTI2_IRQHandler	8	static
+tm_stm32f4_exti.c:187:6:EXTI3_IRQHandler	8	static
+tm_stm32f4_exti.c:199:6:EXTI4_IRQHandler	8	static
+tm_stm32f4_exti.c:211:6:EXTI9_5_IRQHandler	8	static
+tm_stm32f4_exti.c:251:6:EXTI15_10_IRQHandler	8	static

@@ -8,7 +8,13 @@
 #include <stm32f4xx_tim.h>
 #include <stm32f4xx_adc.h>
 
+#include "tm_stm32f4_hmc5883l.h"
+
+
 /* Private macro */
+
+#define HMC5883L_Address 0x1E	// adress magnetometru
+
 /* Private function prototypes -----------------------------------------------*/
 /* Private variables */
 /* Private function prototypes */
@@ -19,12 +25,15 @@
 //Itemki podstawowe
 uint8_t sendFlag=0;	// flaga s³u¿¹ca do sprawdzania czy przycisk nie zosta³ ju¿ wciœniêty
 void UstawieniePIN(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin, GPIOMode_TypeDef mode);
+__IO uint32_t TimmingDelay;
 
+// funkja zawieraj¹ca wszystkie ustawiania
+void Ustawianie();
 
 // itemki do pwm i enkodery
 void UstawieniePWM(void);
-int Pulse_lewy = 200;	//pulse 1	LEWY
-int Pulse_prawy = 200;	//pulse 2	PRAWY
+int Pulse_lewy = 100;	//pulse 1	LEWY
+int Pulse_prawy = 105;	//pulse 2	PRAWY
 char Pulse_lewy_char[] = " ";	//pulse 1	LEWY
 char Pulse_prawy_char[] = " ";	//pulse 2	PRAWY
 
@@ -63,6 +72,9 @@ void ZapalDiode1();
 void ZgasDiode1();
 int silniki_testy = 0;
 
+
+
+
 // itemki pod sterownik silnika
 void UstawienieSilnikow();
 
@@ -72,9 +84,23 @@ void Silniki_Tyl();
 void Silniki_Lewo();
 void Silniki_Prawo();
 
-// funkja zawieraj¹ca wszystkie ustawiania
-void Ustawianie();
+// Funkcje i zmienne pod algorytm
+void Sprawdz_odleglosc()	;		// zwraca int zaleznie od strefy w której widzi przeszkode
+void Jedz_impuls(int impuls); 			// jedzie o do przodu o impuls enkodera
 
+int Strefa_odleglosc = 0;   // zmienna zapisujaca aktualna strefe przed robotem
+int CzyMogeJechac();	// sprawdza jaka strefa przed nami
+
+int jazda =0;
+
+void Algorytm_jazdy(); 			// jedziemy kilka razy i omijamy przeszkody :D
+
+
+
+
+
+
+TM_HMC5883L_t HMC5883L;
 
 /**
 **===========================================================================
@@ -115,6 +141,30 @@ int main(void)
   //ustawienie adc
   UstawienieADC3();
 
+/*
+	// Init HMC5883L sensor /
+	if (TM_HMC5883L_Init(&HMC5883L, TM_HMC5883L_Gain_1_3, TM_HMC5883L_OutputRate_15Hz) == TM_HMC5883L_Result_Ok) {
+		//* Device OK /
+		//printf("Device Initialized\n");
+		Wyslij_zdanie("dziala ",6);
+	} else {
+		//printf("Device Error\n");
+		Wyslij_zdanie("hujaaa",6);
+
+		// Infinite loop /
+		while (1);
+	}
+*/
+
+	//STM_EVAL_LEDOn(LED4);
+	//GPIO_SetBits(GPIOD, GPIO_Pin_13);
+
+
+	SysTick_Config(SystemCoreClock/1000);
+	//SystemCoreClockUpdate();
+	//ii = SystemCoreClock;
+	//ii=0;
+
 
   /* Infinite loop */
   while (1)
@@ -122,43 +172,17 @@ int main(void)
 
 	OdpowiedzUART(); // funkcja z automatu odsyla wiadomosci odebrane :P
 
-
-
-
-	if(GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_0) == 1) // przycisk
+	if(jazda == 1)
 	{
-		GPIO_SetBits(GPIOD, GPIO_Pin_12);
-		GPIO_ResetBits(GPIOD, GPIO_Pin_14);
-		//ZapalDiode1();
+	Algorytm_jazdy();
+	}
 
 
 
-
-
-		if(sendFlag == 0)
+				// DO USTAWIANIA PWM NA OBU KOLACH
+/*
+	if((licznik_lewy%2000) == 5)
 		{
-			//USART_SendData(USART1, "d");
-			//Send_Byte("d");
-			//Wyslij_zdanie(MESSAGE,4);
-
-			//ObslugaCzujkaOdleglosci(); // wysyla jaka odleglosc  - w przyszlosci sprawdzanie odleglosci i zatrzymanie robota
-
-
-			sendFlag = 1;// flaga do sprawdzania czy przycisk wcisniety raz  i nie przytrzymywany
-
-
-					if(silniki_testy == 0)
-					{
-						Silniki_Przod();
-						silniki_testy = 1;
-					}
-					else if(silniki_testy == 1)
-					{
-						Silniki_Stop();
-						silniki_testy = 0;
-					}
-
-
 
 			// pulsy na pwm
 			sprintf(Pulse_prawy_char,"%d",Pulse_prawy);
@@ -183,6 +207,77 @@ int main(void)
 			Wyslij_zdanie(licznik_prawy_char,10);
 			Wyslij_zdanie("\r\n",4);
 			Wyslij_zdanie("\r\n",4);
+
+
+		}
+		*/
+
+/*
+	if(licznik_lewy == 3000)
+	{
+		Silniki_Stop();
+		licznik_lewy =0;
+		licznik_prawy = 0;
+	}
+
+*/
+
+	if(GPIO_ReadInputDataBit(GPIOA,GPIO_Pin_0) == 1) // przycisk
+	{
+		GPIO_SetBits(GPIOD, GPIO_Pin_12);
+		GPIO_ResetBits(GPIOD, GPIO_Pin_14);
+		//ZapalDiode1();
+
+
+
+
+
+		if(sendFlag == 0)
+		{
+			//USART_SendData(USART1, "d");
+			//Send_Byte("d");
+			//Wyslij_zdanie(MESSAGE,4);
+
+			//ObslugaCzujkaOdleglosci(); // wysyla jaka odleglosc  - w przyszlosci sprawdzanie odleglosci i zatrzymanie robota
+			//Sprawdz_odleglosc();
+
+
+			//Jedz_impuls(300);
+
+			jazda = 1;
+
+			sendFlag = 1;// flaga do sprawdzania czy przycisk wcisniety raz  i nie przytrzymywany
+
+
+			/*
+					if(silniki_testy == 0)
+					{
+						Silniki_Przod();
+						silniki_testy = 1;
+					}
+					else if(silniki_testy == 1 )
+					{
+						Silniki_Stop();
+						silniki_testy = 0;
+					}
+
+*/
+
+
+/*
+					Pulse_lewy = Pulse_lewy + 50;	//pulse 1	LEWY
+					Pulse_prawy = Pulse_prawy + 50;	//pulse 2	PRAWY
+					if(Pulse_lewy == 250)
+					{
+						Pulse_lewy = 50;
+						Pulse_prawy = 50;
+					}
+
+
+					  UstawieniePWM();
+
+*/
+
 
 			/*
 
@@ -377,13 +472,96 @@ void ObslugaCzujkaOdleglosci()
 	ADC3ConvertedVoltage = ADC3ConvertedValue *3300/0xFFF;
 	uint32_t v=0,mv=0;
 	uint8_t text[50];
+	uint8_t text2[50];
 
 	// HEH przeliczanie tego gÃ³wna
 	v=(ADC3ConvertedVoltage)/1000;
 	mv = (ADC3ConvertedVoltage%1000)/100;
 	sprintf((char*)text,"   ADC = %d,%d V   ",v,mv);	// podobno uzywanie sprintf do wysylki przez uart mega obciaza procka
-	Wyslij_zdanie(text,20);
+	sprintf((char*)text2," zobaczmy : %d  ",ADC3ConvertedVoltage);
+
+//	Wyslij_zdanie(text,20);
+//	Wyslij_zdanie("\r\n",4);
+
+	Wyslij_zdanie(text2,20);
+	Wyslij_zdanie("\r\n",4);
+
+
+
 }
+void Sprawdz_odleglosc()
+{
+	ADC3ConvertedVoltage = ADC3ConvertedValue *3300/0xFFF;
+
+
+	if(ADC3ConvertedVoltage > 1250)
+	{
+		Wyslij_zdanie("Widze cos do 20cm.",20);
+		Wyslij_zdanie("\r\n",4);
+		Strefa_odleglosc = 1;
+	}
+	else if(ADC3ConvertedVoltage < 600)
+	{
+		Wyslij_zdanie("Widze cos za  40cm.",20);
+		Wyslij_zdanie("\r\n",4);
+		Strefa_odleglosc = 3;
+	}
+	else
+	{
+		Wyslij_zdanie("Widze cos miedzy 20 a 40cm.",20);
+		Wyslij_zdanie("\r\n",4);
+		Strefa_odleglosc = 2;
+
+	}
+
+
+}
+void Jedz_impuls(int impuls)
+{
+	int zadane =  licznik_lewy + impuls;
+	Silniki_Przod();
+	while(zadane > licznik_lewy)
+	{}
+
+	Silniki_Stop();
+}
+int CzyMogeJechac()
+{
+	Sprawdz_odleglosc();
+	if(Strefa_odleglosc == 3 || Strefa_odleglosc == 2)
+	{
+		Wyslij_zdanie("Jedziemy",20);
+		Wyslij_zdanie("\r\n",4);
+		return 1;
+
+	}
+	else
+	{
+		Wyslij_zdanie("Przeszkoda - nie mozna jechac.",20);
+		Wyslij_zdanie("\r\n",4);
+		return 0;
+	}
+
+}
+
+void Algorytm_jazdy()
+{
+	GPIO_ToggleBits(GPIOD,GPIO_Pin_13);
+	Delay(5000);		// 5 sekund
+	Sprawdz_odleglosc()	;		// zwraca int zaleznie od strefy w której widzi przeszkode
+	ObslugaCzujkaOdleglosci();
+	GPIO_ToggleBits(GPIOD,GPIO_Pin_13);
+	if(CzyMogeJechac() == 0)
+	{
+		// Infinite loop /
+		while (1);
+	}
+
+	Jedz_impuls(300); 			// jedzie o do przodu o impuls enkodera
+
+
+}
+
 
 /*
  * Zapala diode testow¹ 1
@@ -678,7 +856,7 @@ void EXTI0_IRQHandler(void) {
     				licznik_lewy--;
     			}
 
-    		if(licznik_lewy > 10000 || licznik_lewy <-10000)
+    		if(licznik_lewy > 30000 || licznik_lewy <-30000)
     		{
     			licznik_lewy = 0;
     		}
@@ -705,7 +883,7 @@ void EXTI1_IRQHandler(void) {
     				licznik_prawy++;
     			}
 
-    		if(licznik_prawy > 10000 || licznik_prawy <-10000)
+    		if(licznik_prawy > 30000 || licznik_prawy <-30000)
     		{
     			licznik_prawy = 0;
     		}
@@ -716,3 +894,23 @@ void EXTI1_IRQHandler(void) {
     }
 }
 
+/**
+  * @brief  This function handles SysTick Handler.
+  * @param  None
+  * @retval None
+  */
+
+
+
+void SysTick_Handler(void)
+{
+  if(TimmingDelay !=0)
+  {
+    TimmingDelay --;
+   }
+}
+void Delay(__IO uint32_t time)
+{
+  TimmingDelay = time;
+  while(TimmingDelay !=0);
+}
