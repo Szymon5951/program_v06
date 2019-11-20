@@ -20,7 +20,7 @@
 
 /* Private variables */
 static uint32_t TM_I2C_Timeout;
-static uint32_t TM_I2C_INT_Clocks[3] = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF};
+ TM_I2C_INT_Clocks[3] = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF};
 
 /* Private defines */
 #define I2C_TRANSMITTER_MODE   0
@@ -94,6 +94,8 @@ void TM_I2C_Init(I2C_TypeDef* I2Cx, TM_I2C_PinsPack_t pinspack, uint32_t clockSp
 		I2C_InitStruct.I2C_Ack = TM_I2C3_ACK;
 		I2C_InitStruct.I2C_DutyCycle = TM_I2C3_DUTY_CYCLE;
 	}
+
+	Wyslij_zdanie("tujest ",6);
 	
 	/* Disable I2C first */
 	I2Cx->CR1 &= ~I2C_CR1_PE;
@@ -188,6 +190,7 @@ uint8_t TM_I2C_IsDeviceConnected(I2C_TypeDef* I2Cx, uint8_t address) {
 		connected = 1;
 	}
 	
+
 	/* STOP I2C */
 	TM_I2C_Stop(I2Cx);
 	
@@ -231,6 +234,7 @@ int16_t TM_I2C_Start(I2C_TypeDef* I2Cx, uint8_t address, uint8_t direction, uint
 			}
 		}
 	}
+	Wyslij_zdanie("GNIOT ",6);
 	if (direction == I2C_RECEIVER_MODE) {
 		/* Send address with 1 last bit */
 		I2Cx->DR = address | I2C_OAR1_ADD0;

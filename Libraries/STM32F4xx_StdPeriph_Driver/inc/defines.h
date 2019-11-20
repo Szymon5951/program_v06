@@ -29,5 +29,19 @@
 #define TM_DEFINES_H
 
 /* Put your global defines for all libraries here used in your project */
-
+#ifndef TM_I2C3_ACKNOWLEDGED_ADDRESS
+#define TM_I2C3_ACKNOWLEDGED_ADDRESS	I2C_AcknowledgedAddress_7bit
+#endif
+#ifndef TM_I2C3_MODE
+#define TM_I2C3_MODE					I2C_Mode_I2C
+#endif
+#ifndef TM_I2C3_OWN_ADDRESS
+#define TM_I2C3_OWN_ADDRESS				0x00
+#endif
+#ifndef TM_I2C3_ACK
+#define TM_I2C3_ACK						I2C_Ack_Disable
+#endif
+#ifndef TM_I2C3_DUTY_CYCLE
+#define TM_I2C3_DUTY_CYCLE				I2C_DutyCycle_2
+#endif
 #endif

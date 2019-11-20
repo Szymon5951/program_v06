@@ -82,8 +82,8 @@ extern "C" {
 
 /* Default I2C for sensor */
 #ifndef HMC5883L_I2C
-#define HMC5883L_I2C            I2C1
-#define HMC5883L_I2C_PINSPACK   TM_I2C_PinsPack_2
+#define HMC5883L_I2C            I2C3
+#define HMC5883L_I2C_PINSPACK   TM_I2C_PinsPack_1
 #endif
 
 /* I2C clock speed */
@@ -92,7 +92,7 @@ extern "C" {
 #endif
 
 /* I2C address for HMC5883L */
-#define HMC5883L_I2C_ADDR       0x3C //0x1E//0x3C
+#define HMC5883L_I2C_ADDR      0x1E//0x3C	1E - address 7bit, 3C adress 8 bit write
 
 /* Data ready for HMC5883L */
 #ifndef HMC5883L_DRDY_PIN
