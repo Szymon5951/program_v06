@@ -92,23 +92,32 @@ void Silniki_Lewo();
 void Silniki_Prawo();
 
 // Funkcje i zmienne pod algorytm
-void Sprawdz_odleglosc()	;		// zwraca int zaleznie od strefy w której widzi przeszkode
-
-void Jedz_odleglosc(int odleglosc);
-
-
+int Sprawdz_odleglosc();		// zwraca int zaleznie od strefy w której widzi przeszkode
 int Sprawdz_lewy();
+int Sprawdz_prawy();
+int Sprawdz_przod();	// sprawdza jaka strefa przed nami
+
+void Skret_Lewo();
+void Skret_Prawo();
+
+void Wykonaj_ruch();
+
+int kierunek = 1;	//1 - Prosto, 2- Prawo, 3 - TYL, 4 - LEWO
+int ruch_pion = 0;
+int ruch_poziom = 0;
+
 
 
 void Jedz_impuls(int impuls); 			// jedzie o do przodu o impuls enkodera
 
 int Strefa_odleglosc = 0;   // zmienna zapisujaca aktualna strefe przed robotem
-int CzyMogeJechac();	// sprawdza jaka strefa przed nami
+
 
 int jazda =0;
 
-void Skret_Lewo();
-void Skret_Prawo();
+
+
+
 
 int Omijanie_Przeszkody();
 
@@ -180,12 +189,11 @@ int main(void)
 
 
 
-
 	// TU MUSIMY ZAPODAC ZADANIE : PRZEJEDZ ODLEGLOSC.
 
 	if(jazda == 1)
 	{
-		Algorytm_jazdy(10);
+		Wykonaj_ruch();
 	}
 
 
@@ -198,13 +206,16 @@ int main(void)
 			GPIO_ResetBits(GPIOD, GPIO_Pin_14);
 			//ZapalDiode1();
 
-			//jazda = 1;
+			jazda = 1;
 			sendFlag = 1;// flaga do sprawdzania czy przycisk wcisniety raz  i nie przytrzymywany
 
 
 
-			Jedz_odleglosc(132);
 
+		//	Jedz_odleglosc(132);
+
+		//	Wyslij_int("Zlecona odleglosc: %d",odleglosc);
+		//	Wyslij_int("Odcinkow po 10cm: %d",odcinek);
 
 
 
@@ -403,7 +414,7 @@ void ObslugaCzujkaOdleglosci()
 
 
 }
-void Sprawdz_odleglosc()
+int Sprawdz_odleglosc()
 {
 	ADC3ConvertedVoltage = ADC3ConvertedValue *3300/0xFFF;
 
@@ -412,37 +423,59 @@ void Sprawdz_odleglosc()
 	{
 		Wyslij_zdanie("Widze cos do 20cm.",20);
 		Wyslij_zdanie("\r\n",4);
-		Strefa_odleglosc = 1;
+		//Strefa_odleglosc = 1;
+		return 1;
 	}
 	else if(ADC3ConvertedVoltage < 600)
 	{
 		Wyslij_zdanie("Widze cos za  40cm.",20);
 		Wyslij_zdanie("\r\n",4);
-		Strefa_odleglosc = 3;
+		//Strefa_odleglosc = 3;
+		return 3;
 	}
 	else
 	{
 		Wyslij_zdanie("Widze cos miedzy 20 a 40cm.",20);
 		Wyslij_zdanie("\r\n",4);
-		Strefa_odleglosc = 2;
-
+		//Strefa_odleglosc = 2;
+		return 2;
 	}
 
 
 }
-int Sprawdz_lewy()
+int Sprawdz_lewy() // Zwraca 0 jak jest przeszkoda i 1 jak nnie ma
 {
 	if(GPIO_ReadInputDataBit(GPIOC,GPIO_Pin_1) == 0) // PC1 to jest lewy czujnik optycczny
 	{
-		GPIO_SetBits(GPIOD, GPIO_Pin_15);
+		//GPIO_SetBits(GPIOD, GPIO_Pin_15);
+		Wyslij_zdanie("Przeszkoda po lewej stronie.",30);
+		Wyslij_zdanie("\r\n",4);
 		return 0;
-
 	}
 	else
 	{
-		GPIO_ResetBits(GPIOD, GPIO_Pin_15);
+		//GPIO_ResetBits(GPIOD, GPIO_Pin_15);
+		Wyslij_zdanie("Brak przeszkody po lewej stronie.",30);
+		Wyslij_zdanie("\r\n",4);
 		return 1;
+	}
 
+}
+int Sprawdz_prawy()	// Zwraca 0 jak jest przeszkoda i 1 jak nnie ma
+{
+	if(GPIO_ReadInputDataBit(GPIOC,GPIO_Pin_3) == 0) // PC1 to jest lewy czujnik optycczny
+	{
+		//GPIO_SetBits(GPIOD, GPIO_Pin_15);
+		Wyslij_zdanie("Przeszkoda po prawej stronie.",30);
+		Wyslij_zdanie("\r\n",4);
+		return 0;
+	}
+	else
+	{
+		//GPIO_ResetBits(GPIOD, GPIO_Pin_15);
+		Wyslij_zdanie("Brak przeszkody po prawej stronie.",30);
+		Wyslij_zdanie("\r\n",4);
+		return 1;
 	}
 
 }
@@ -453,12 +486,13 @@ void Jedz_impuls(int impuls)
 {
 	Wyslij_zdanie("Jedziemy prosto",20);
 	Wyslij_zdanie("\r\n",4);
-	Delay(2000);	//odczekamy sobie dwie sekundy
+	Delay(1000);	//odczekamy sobie dwie sekundy
 
+	licznik_lewy = 0;
 
-	int zadane =  licznik_lewy + impuls;		// w sumie nie istotne jaki bedzie licznik_lewy
+	//int zadane =  licznik_lewy + impuls;		// w sumie nie istotne jaki bedzie licznik_lewy
 	Silniki_Przod();
-	while(zadane > licznik_lewy)
+	while(impuls > licznik_lewy)
 	{}
 	Silniki_Stop();
 
@@ -491,12 +525,12 @@ void Skret_Prawo()
 }
 
 
-int CzyMogeJechac()
+int Sprawdz_przod()	// zwraca 1 jak mozna jechac, 0 jak nie
 {
-	Sprawdz_odleglosc();
+	Strefa_odleglosc = Sprawdz_odleglosc();
 	if(Strefa_odleglosc == 3 || Strefa_odleglosc == 2)
 	{
-		Wyslij_zdanie("Jedziemy",20);
+		Wyslij_zdanie("Brak przeszkody z przodu - jedziemy.",20);
 		Wyslij_zdanie("\r\n",4);
 		return 1;
 
@@ -509,23 +543,425 @@ int CzyMogeJechac()
 	}
 
 }
-void Jedz_odleglosc(int odleglosc) // podana w centymetrach
+void Wykonaj_ruch()
 {
-	// odleglosc w cm, przeliczamy na odcinki po 10cm.
-	int odcinek = odleglosc /10;
+	Delay(2000);
+	// Generalnie ruch przebiega poprzez wybrór dnego z ruchów : prosto/lewo/prawo
+	// Napierw sprawdzane jest przemieszczenie w poziomie	: 3 opcje
+	// Zaleznie od tego sprawdzane jest w jakim kierunku zwrocony jest robot	: 4 opcje
+	// Algorytm wybiera jeden z 12 scenariuszy : 3 przemieszczenia x 4 opcje kierunku
 
-	Wyslij_int("Zlecona odleglosc: %d",odleglosc);
-	Wyslij_int("Odcinkow po 10cm: %d",odcinek);
-
-
-	for(int i = 0;i<odcinek;i++)
+	if(ruch_poziom == 0)	// robot na trasie
 	{
-	// Jedz impuls(300) jedzie 10cm
+		if(kierunek == 1)	// robot na trasie zwrocony do przodu
+		{
+			if(Sprawdz_przod() == 1)
+			{
+				Jedz_impuls(300);
+				ruch_pion = ruch_pion + 10;
+			}
+			else
+			{
+				if(Sprawdz_prawy() == 1)
+				{
+					Skret_Prawo();
+					kierunek = 2;
+				}
+				else
+				{
+					if(Sprawdz_lewy() == 1)
+					{
+						Skret_Lewo();
+						kierunek = 4;
+					}
+					else
+					{
+						Wyslij_zdanie("Slepy zaulek - STOP.",20);
+						Wyslij_zdanie("\r\n",4);
+					}
+				}
+			}
+			Wyslij_zdanie("Scenariusz 1 - robot na trasie zwrocony do przodu.",20);
+			Wyslij_zdanie("\r\n",4);
 
-		Jedz_impuls(300);
+		}
+		else if(kierunek == 2)	//robot na	trasie zwrocony w prawo
+		{
+			if(Sprawdz_lewy() == 1)
+						{
+							Skret_Lewo();
+							kierunek = 1;
+						}
+						else
+						{
+							if(Sprawdz_przod() == 1)
+							{
+								Jedz_impuls(300);
+								ruch_poziom = ruch_poziom + 10;
+							}
+							else
+							{
+								if(Sprawdz_prawy() == 1)
+								{
+									Skret_Prawo();
+									kierunek = 3;
+								}
+								else
+								{
+									Wyslij_zdanie("Slepy zaulek - STOP.",20);
+									Wyslij_zdanie("\r\n",4);
+								}
+							}
+						}
+						Wyslij_zdanie("Scenariusz 2 - robot na	trasie zwrocony w prawo.",20);
+						Wyslij_zdanie("\r\n",4);
+
+
+		}
+		else if(kierunek == 3)	//robot na trasie zwrocony w tyl
+		{
+			if(Sprawdz_prawy() == 1)
+			{
+				Skret_Prawo();
+				kierunek = 4;
+			}
+			else
+			{
+				if(Sprawdz_lewy() == 1)
+				{
+					Skret_Lewo();
+					kierunek = 2;
+				}
+				else
+				{
+					if(Sprawdz_przod() == 1)
+					{
+						Jedz_impuls(300);
+						ruch_pion = ruch_pion -10;
+					}
+					else
+					{
+						Wyslij_zdanie("Slepy zaulek - STOP.",20);
+						Wyslij_zdanie("\r\n",4);
+					}
+				}
+			}
+			Wyslij_zdanie("Scenariusz 3 - robot na trasie zwrocony w tyl.",20);
+			Wyslij_zdanie("\r\n",4);
+
+		}
+		else if(kierunek == 4)	//robot na trasie zwrocony w lewo
+		{
+			if(Sprawdz_prawy() == 1)
+			{
+				Skret_Prawo();
+				kierunek = 1;
+			}
+			else
+			{
+				if(Sprawdz_przod() == 1)
+				{
+					Jedz_impuls(300);
+					ruch_poziom = ruch_poziom - 10;
+				}
+				else
+				{
+					if(Sprawdz_lewy() == 1)
+					{
+						Skret_Lewo();
+						kierunek = 3;
+					}
+					else
+					{
+						Wyslij_zdanie("Slepy zaulek - STOP.",20);
+						Wyslij_zdanie("\r\n",4);
+					}
+				}
+			}
+			Wyslij_zdanie("Scenariusz 4 - robot na trasie zwrocony w lewo.",20);
+			Wyslij_zdanie("\r\n",4);
+
+		}
+
+	}
+	else if(ruch_poziom > 0)	// robot zjechal w prawo
+	{
+		if(kierunek == 1)	// robot zjechal w prawo zwrocony do przodu
+		{
+			if(Sprawdz_lewy() == 1)
+						{
+							Skret_Lewo();
+							kierunek = 4;
+						}
+						else
+						{
+							if(Sprawdz_przod() == 1)
+							{
+								Jedz_impuls(300);
+								ruch_pion = ruch_pion + 10;
+							}
+							else
+							{
+								if(Sprawdz_prawy() == 1)
+								{
+									Skret_Prawo();
+									kierunek = 2;
+								}
+								else
+								{
+									Wyslij_zdanie("Slepy zaulek - STOP.",20);
+									Wyslij_zdanie("\r\n",4);
+								}
+							}
+						}
+						Wyslij_zdanie("Scenariusz 5 - robot zjechal w prawo zwrocony do przodu.",20);
+						Wyslij_zdanie("\r\n",4);
+
+		}
+		else if(kierunek == 2)	// robot zjechal w prawo zwrocony w prawo
+		{
+			if(Sprawdz_lewy() == 1)
+						{
+							Skret_Lewo();
+							kierunek = 1;
+							Jedz_impuls(300);
+							Jedz_impuls(300);	// Wyj¹tek
+							Jedz_impuls(300);
+							ruch_pion = ruch_pion + 30;
+						}
+						else
+						{
+							if(Sprawdz_przod() == 1)
+							{
+								Jedz_impuls(300);
+								ruch_poziom = ruch_poziom + 10;
+							}
+							else
+							{
+								if(Sprawdz_prawy() == 1)
+								{
+									Skret_Prawo();
+									kierunek = 3;
+								}
+								else
+								{
+									Wyslij_zdanie("Slepy zaulek - STOP.",20);
+									Wyslij_zdanie("\r\n",4);
+								}
+							}
+						}
+						Wyslij_zdanie("Scenariusz 6 - robot zjechal w prawo zwrocony w prawo.",20);
+						Wyslij_zdanie("\r\n",4);
+
+		}
+		else if(kierunek == 3)	// robot zjechal w prawo zwrocony w tyl
+		{
+			if(Sprawdz_prawy() == 1)
+						{
+							Skret_Prawo();
+							kierunek = 4;
+						}
+						else
+						{
+							if(Sprawdz_lewy() == 1)
+							{
+								Skret_Lewo();
+								kierunek = 2;
+							}
+							else
+							{
+								if(Sprawdz_przod() == 1)
+								{
+									Jedz_impuls(300);
+									ruch_pion = ruch_pion - 10;
+								}
+								else
+								{
+									Wyslij_zdanie("Slepy zaulek - STOP.",20);
+									Wyslij_zdanie("\r\n",4);
+								}
+							}
+						}
+						Wyslij_zdanie("Scenariusz 7 - robot zjechal w prawo zwrocony w tyl.",20);
+						Wyslij_zdanie("\r\n",4);
+
+		}
+		else if(kierunek == 4)	// robot zjechal w prawo zwrocony w lewo
+		{
+			if(Sprawdz_przod() == 1)
+						{
+							Jedz_impuls(300);
+							ruch_poziom = ruch_poziom - 10;
+						}
+						else
+						{
+							if(Sprawdz_prawy() == 1)
+							{
+								Skret_Prawo();
+								kierunek = 1;
+							}
+							else
+							{
+								if(Sprawdz_lewy() == 1)
+								{
+									Skret_Lewo();
+									kierunek = 3;
+								}
+								else
+								{
+									Wyslij_zdanie("Slepy zaulek - STOP.",20);
+									Wyslij_zdanie("\r\n",4);
+								}
+							}
+						}
+						Wyslij_zdanie("Scenariusz 8 - robot zjechal w prawo zwrocony w lewo.",20);
+						Wyslij_zdanie("\r\n",4);
+
+		}
+
+	}
+	else if(ruch_poziom < 0)	// robot zjechal w lewo
+	{
+		if(kierunek == 1)	// robot zjechal w lewo zwrocony do przodu
+		{
+			if(Sprawdz_prawy() == 1)
+						{
+							Skret_Prawo();
+							kierunek = 2;
+						}
+						else
+						{
+							if(Sprawdz_przod() == 1)
+							{
+								Jedz_impuls(300);
+								ruch_pion = ruch_pion + 10;
+							}
+							else
+							{
+								if(Sprawdz_lewy() == 1)
+								{
+									Skret_Lewo();
+									kierunek = 4;
+								}
+								else
+								{
+									Wyslij_zdanie("Slepy zaulek - STOP.",20);
+									Wyslij_zdanie("\r\n",4);
+								}
+							}
+						}
+						Wyslij_zdanie("Scenariusz 9 - robot zjechal w lewo zwrocony do przodu.",20);
+						Wyslij_zdanie("\r\n",4);
+
+		}
+		else if(kierunek == 2)	// robot zjechal w lewo zwrocony w prawo
+		{
+			if(Sprawdz_przod() == 1)
+						{
+							Jedz_impuls(300);
+							ruch_poziom = ruch_poziom + 10;
+						}
+						else
+						{
+							if(Sprawdz_lewy() == 1)
+							{
+								Skret_Lewo();
+								kierunek = 1;
+							}
+							else
+							{
+								if(Sprawdz_prawy() == 1)
+								{
+									Skret_Prawo();
+									kierunek = 3;
+								}
+								else
+								{
+									Wyslij_zdanie("Slepy zaulek - STOP.",20);
+									Wyslij_zdanie("\r\n",4);
+								}
+							}
+						}
+						Wyslij_zdanie("Scenariusz 10 - robot zjechal w lewo zwrocony w prawo.",20);
+						Wyslij_zdanie("\r\n",4);
+
+		}
+		else if(kierunek == 3)	// robot zjechal w lewo zwrocony w tyl
+		{
+			if(Sprawdz_lewy() == 1)
+						{
+							Skret_Lewo();
+							kierunek = 2;
+						}
+						else
+						{
+							if(Sprawdz_prawy() == 1)
+							{
+								Skret_Prawo();
+								kierunek = 4;
+							}
+							else
+							{
+								if(Sprawdz_przod() == 1)
+								{
+									Jedz_impuls(300);
+									ruch_pion = ruch_pion + 10;
+								}
+								else
+								{
+									Wyslij_zdanie("Slepy zaulek - STOP.",20);
+									Wyslij_zdanie("\r\n",4);
+								}
+							}
+						}
+						Wyslij_zdanie("Scenariusz 11 - robot zjechal w lewo zwrocony w tyl.",20);
+						Wyslij_zdanie("\r\n",4);
+
+		}
+		else if(kierunek == 4) // robot zjechal w lewo zwrocony w tyl
+		{
+			if(Sprawdz_prawy() == 1)
+						{
+							Skret_Prawo();
+							kierunek = 1;
+							Jedz_impuls(300);
+							Jedz_impuls(300);	//Wyjatek
+							Jedz_impuls(300);
+							ruch_pion = ruch_pion + 30;
+						}
+						else
+						{
+							if(Sprawdz_przod() == 1)
+							{
+								Jedz_impuls(300);
+								ruch_poziom = ruch_poziom - 10;
+							}
+							else
+							{
+								if(Sprawdz_lewy() == 1)
+								{
+									Skret_Lewo();
+									kierunek = 3;
+
+								}
+								else
+								{
+									Wyslij_zdanie("Slepy zaulek - STOP.",20);
+									Wyslij_zdanie("\r\n",4);
+								}
+							}
+						}
+						Wyslij_zdanie("Scenariusz 12 - robot zjechal w lewo zwrocony w tyl.",20);
+						Wyslij_zdanie("\r\n",4);
+
+		}
 
 	}
 
+
+	Wyslij_int("Przejechane w pionie: %d.", ruch_pion);
+	Wyslij_int("Przejechane w poziomie: %d.", ruch_poziom);
+	Wyslij_int("Obrany kiernek: %d.", kierunek);
 
 
 }
@@ -552,48 +988,7 @@ void Algorytm_jazdy(int powtorzenia)
 			}
 	}
 }
-int Omijanie_Przeszkody()
-{
-	Wyslij_zdanie("AKCJA - OMIJANIE",20);
-	Wyslij_zdanie("\r\n",4);
 
-					Skret_Prawo();
-
-					Jedz_impuls(300);
-					Jedz_impuls(300);
-
-					Skret_Lewo();
-
-
-					int n =5;
-					Jedz_impuls(300);
-					Jedz_impuls(300);
-					Jedz_impuls(300);
-					Jedz_impuls(300);
-					while(Sprawdz_lewy() == 0)
-					{
-						Jedz_impuls(300);
-						n++;
-					}
-					Jedz_impuls(300);
-
-					Skret_Lewo();
-
-					Jedz_impuls(300);
-					Jedz_impuls(300);
-
-					Skret_Prawo();
-
-
-					uint8_t text[50];
-
-					sprintf((char*)text,"   Jechalismy razy : %d ",n);	// podobno uzywanie sprintf do wysylki przez uart mega obciaza procka
-					Wyslij_zdanie(text,20);
-					Wyslij_zdanie("\r\n",4);
-
-					return n;
-
-}
 
 
 /*
@@ -795,7 +1190,8 @@ void Ustawianie()
 	  /* Diody testowe */
 	  UstawieniePIN(GPIOA,GPIO_Pin_1,GPIO_Mode_OUT);
 
-	  UstawieniePIN(GPIOC,GPIO_Pin_1,GPIO_Mode_IN);
+	  UstawieniePIN(GPIOC,GPIO_Pin_1,GPIO_Mode_IN);	//Sprawdz lewy
+	  UstawieniePIN(GPIOC,GPIO_Pin_3,GPIO_Mode_IN);	//Sprawdz lewy
 	  /* USER Button */
 	  UstawieniePIN(GPIOA,GPIO_Pin_0,GPIO_Mode_IN);
 	  GPIO_SetBits(GPIOD, GPIO_Pin_14);
